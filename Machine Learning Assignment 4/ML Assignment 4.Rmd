@@ -1,0 +1,149 @@
+---
+title: "Cluster Analysis"
+author: "Ashley Riley"
+date: "2023-10-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Directions**
+
+An equities analyst is studying the pharmaceutical industry and would like your help in exploring and understanding the financial data collected by her firm. Her main objective is to understand the structure of the pharmaceutical industry using some basic financial measures. Financial data gathered on 21 firms in the pharmaceutical industry are available in the file Pharmaceuticals.csv. For each firm, the following variables are recorded:
+
+1. Market capitalization (in billions of dollars)
+2. Beta
+3. Price/earnings ratio
+4. Return on equity
+5. Return on assets
+6. Asset turnover
+7. Leverage
+8. Estimated revenue growth
+9. Net profit margin
+10. Median recommendation (across major brokerages)
+11. Location of firm’s headquarters
+12. Stock exchange on which the firm is listed
+
+Use cluster analysis to explore and analyze the given data set as follows:
+
+**a. Use only the numerical variables (1 to 9) to cluster the 21 firms. Justify the various choices made in conducting the cluster analysis, such as weights for different variables, the specific clustering algorithm(s) used, the number of clusters formed, and so on.**
+
+
+```{r}
+
+#install.packages("factoextra")
+#install.packages("ggcorrplot")
+#define required libraries
+library(factoextra)
+library(tidyverse)
+library(ISLR)
+library(ggcorrplot)
+
+
+#Import pharmaceutical data file
+
+df<-read.csv("/Users/ashleyriley/Desktop/Fundamentals of Machine Learning/RStudio/Assignment 4/Pharmaceuticals.csv", header = TRUE, sep = ",")
+df
+```
+
+This is a visual representation of the distances between observations and can help identify how data points are grouped based on how similar or different they are.
+
+
+```{r}
+set.seed(11)
+
+#Select only the quantitative variables
+pharm_df <- df[, 3:11]
+
+summary(pharm_df)
+
+
+#scale the data frame to avoid outliers skewing the clustering process. Best practice is to normalize the data before computing Euclidean distance.
+pharm_df<-scale(pharm_df)
+
+summary(pharm_df)
+
+#calculating distance between observations & visualize using factoextra and setting the method to euclidian distance
+dist<-get_dist(pharm_df, method = "euclidean")
+dist
+
+fviz_dist(dist)
+
+```
+
+Since the most important parameter for k-means clustering is the number of clusters (k), let's examine some other methods to help understand what the ideal value for k should be. Using the elbow method, we can visualize the best candidate value for k. The Elbow method depicts a k value of 5.  While the line is still decreasing, we can see that after k=5, the rate of decrease is much smaller.
+
+```{r}
+
+#using fviz_nbclust() function to visualize where the "bend" is on the line to indicate appropriate amount of clusters (k)
+fviz_nbclust(pharm_df, kmeans, method = "wss")
+
+```
+
+
+Now, let's see what result the silhouette method provides for number of clusters k. This method agrees with the elbow method that an appropriate value for k should be 5.
+
+```{r}
+
+fviz_nbclust(pharm_df, kmeans, method="silhouette")
+
+```
+
+Let's now do the kmeans cluster analysis using the value of k=5 that we had found using the elbow and silhouette methods. Below, you can see 5 clusters are well-separated. 
+
+```{r}
+
+k5<- kmeans(pharm_df, centers=5, nstart=25)
+str(k5)
+#show centroids
+k5$centers
+
+#show size 
+k5$size
+
+#visualize the cluster
+fviz_cluster(k5, data=pharm_df,)
+
+```
+
+**b. Interpret the clusters with respect to the numerical variables used in forming the clusters.**
+
+Each cluster contains a set of observations assigned to that specific cluster. The numbers in the cluster represent the index of a data point within our data set.  Within each cluster is a cluster centroid. This is the mean for the variables in the cluster. We also look at cluster size above. This gives the number of observations in a given cluster.  In the plot above, we have:
+
+Cluster 1: Size was 2. Includes rows 18 and 2. This cluster has with lowest beta, lowest ROE, lowest net profit margin and highest PE Ratio.
+
+Cluster 2: Size was 4. Includes rows 5, 9, 14, and 20. This cluster has with lowest PE ratio, lowest asset turnover and highest rev_growth.
+
+Cluster 3: Size was 8. Includes rows 1, 3, 4, 7, 10, 16, 19 and 21. This cluster has the lowest revenue growth.
+
+Cluster 4: Size was 3. Includes rows 6,8, and 12. This cluster has lowest market cap, lowest ROA,  highest beta, highest leverage.
+
+Cluster 5: Size was 4. Includes rows 11, 13, 15, and 17. This cluster is categorized by Highest Net Profit margin, Highest asset turnover, highest ROA, highest ROE, highest market cap and lowest leverage.
+
+
+**c. Is there a pattern in the clusters with respect to the numerical variables (10 to 12)? (those not used in forming the clusters)**
+
+Cluster 1, with lowest beta, lowest ROE, lowest net profit margin and highest PE Ratio which doesn't really tell us much since there are only two observations.  
+
+Cluster 2, with lowest PE ratio, lowest asset turnover and highest rev_growth has the median recommendation values evenly between moderate buy and sell and has exchange values of "NYSE".  
+
+Cluster 3, which has the lowest revenue growth has the most Median Recommendation values of "Hold" and Locations either mostly in US/UK.  
+
+Cluster 4, which has lowest market cap, lowest ROA,  highest beta, highest leverage, has mostly hold for median recommendation. 
+
+Cluster 5, categorized by Highest Net Profit margin, Highest asset turnover, highest ROA, highest ROE, highest market cap and lowest leverage has more of a pattern with location and exchange variables.
+
+**d. Provide an appropriate name for each cluster using any or all of the variables in the dataset.**
+
+Cluster 1:  Lowest beta, lowest ROE, lowest Net Profit cluster
+
+Cluster 2:  Highest revenue growth cluster
+
+Cluster 3:  Lowest revenu growth cluster
+
+Cluster 4:  Highest Leverage Lowest market cap cluster
+
+Cluster 5:  High net profit margin, lowest leverage cluster
+
