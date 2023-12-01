@@ -1,0 +1,226 @@
+---
+title: "Hierarchical Clustering - Assignment 5"
+author: "Ashley Riley"
+date: "2023-11-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Load required packages
+#install.packages("stats")
+#install.packages("cluster")
+
+
+
+```
+
+**Directions**
+
+The dataset Cereals.csv includes nutritional information, store display, and consumer ratings for 77 breakfast cereals.
+
+
+**1. Data Preprocessing. Remove all cereals with missing values.**
+
+```{r}
+#Required libraries
+library(stats)
+library(caret)
+library(factoextra)
+library(cluster)
+library(ggcorrplot)
+library(ggplot2)
+
+
+#load our data set
+df_cereal <-read.csv("/Users/ashleyriley/Desktop/Fundamentals of Machine Learning/RStudio/Assignment 5/Cereals.csv", header = TRUE, sep = ",")
+head(df_cereal)
+
+#Get data characteristics (77 rows and 16 columns with 13 numerical and 3 categorical variables)
+str(df_cereal)
+
+#checking number of rows, and NA values to compare with next step (77 rows before data preprocessing)
+nrow(df_cereal)
+
+#checking total number of NA values in the data set (4 values are missing)
+sum(is.na(df_cereal))
+
+#checking to see which columns had NA values
+colSums(is.na(df_cereal))
+
+#Remove cereals with missing values
+df_cereal2<- na.omit(df_cereal)
+
+#checking to see if rows with NA were removed
+nrow(df_cereal2)
+
+#total number of NAs is now 0
+sum(is.na(df_cereal2))
+
+#looking at the colsum to ensure all NAs removed
+colSums(is.na(df_cereal2))
+str(df_cereal2)
+
+```
+
+**2. Apply hierarchical clustering to the data using Euclidean distance to the normalized measurements. Use Agnes to compare the clustering from single linkage, complete linkage, average linkage, and Ward. Choose the best method.**
+
+
+```{r}
+
+#In step 1, we had some categorical variables that we should omit for the following analysis
+df_cereal3 <- df_cereal2[, c(4:12, 14:16)]
+
+head(df_cereal3)
+
+set.seed(11)
+
+#Normalizing the data
+norm_cereals <- scale(df_cereal3)
+
+#applying HC to the normalized data
+#first, lets look at the different linkage methods
+
+#Single Linkage
+hc_single <- agnes(norm_cereals, method = "single")
+print(hc_single$ac)
+
+#Complete Linkage
+hc_complete <- agnes(norm_cereals, method = "complete")
+print(hc_complete$ac)
+
+#Average Linkage
+hc_avg <- agnes(norm_cereals, method = "average")
+print(hc_avg$ac)
+
+#Ward's Linkage
+hc_ward <- agnes(norm_cereals, method = "ward")
+print(hc_ward$ac)
+
+```
+Looking at the agglomerative coefficients for each linkage method above, we can see that **Ward's** was the best choice at **90.87%** accuracy.  This measures the amount of clustering structure found. Values closest to 1 show which method has the strongest clustering structure.
+
+
+**3. How many clusters would you choose?**
+
+```{r}
+
+#To determine appropriate number of clusters, let us generate a dendogram for the ward's linkage
+pltree(hc_ward, cex = 0.5, hang = -1, main = "Cereals Dendogram")
+
+#The diagram above appears to have 5 defined clusters, but let us add borders to visualize better
+rect.hclust(hc_ward, k = 5, border = 1:5)
+
+```
+
+
+**4. Comment on the structure of the clusters and on their stability. Hint: To check stability, partition the data and see how well clusters formed based on one part apply to the other part.**
+To do this:
+a.) Cluster partition A
+b.) Use the cluster centroids from A to assign each record in partition B (each record is assigned to the cluster with the closest centroid).
+
+
+```{r}
+
+#First, let us partition the data into training/validation sets and run the cluster analysis on the partitioned data
+
+#Creating 70/30 split on scaled data from first question
+n_rows <- nrow(norm_cereals)
+
+Index_A <- sample(1:n_rows, size = 0.7*n_rows, replace = FALSE)
+
+partA <- norm_cereals[Index_A, ]
+partB <- norm_cereals[-Index_A, ]
+
+#Checking number of rows in each partition
+nrow(partA)
+nrow(partB)
+
+#Do HC analysis on partition A data
+#Single Linkage
+hc_singleA <- agnes(partA, method = "single")
+print(hc_singleA$ac)
+
+#Complete Linkage A
+hc_completeA <- agnes(partA, method = "complete")
+print(hc_completeA$ac)
+
+#Average Linkage A
+hc_avgA <- agnes(partA, method = "average")
+print(hc_avgA$ac)
+
+#Ward's Linkage A (still best choice)
+hc_wardA <- agnes(partA, method = "ward")
+print(hc_wardA$ac)
+
+#Do HC analysis on partition B data
+#Single Linkage
+hc_singleB <- agnes(partB, method = "single")
+print(hc_singleA$ac)
+
+#Complete Linkage B
+hc_completeB <- agnes(partB, method = "complete")
+print(hc_completeB$ac)
+
+#Average Linkage B
+hc_avgB <- agnes(partB, method = "average")
+print(hc_avgB$ac)
+
+#Ward's Linkage B (still best choice)
+hc_wardB <- agnes(partB, method = "ward")
+print(hc_wardB$ac)
+
+#create dendograms for partitions A and B
+pltree(hc_wardA, cex = 0.5, hang = -1, main = "Cereals Dendogram - Partition A")
+rect.hclust(hc_wardA, k = 5, border = 1:5)
+
+pltree(hc_wardB, cex = 0.5, hang = -1, main = "Cereals Dendogram - Partition B")
+rect.hclust(hc_wardB, k = 5, border = 1:5)
+
+cluster_A_df <- cutree(hc_wardA, k = 5)
+clustersA <-as.data.frame(cbind(partA, cluster_A_df))
+#checking number of rows in cluster A (51)
+nrow(clustersA)
+
+#Create a vector of the mean for each observation in partition A (aka centroid value)
+clustA <- colMeans(clustersA[clustersA$cluster_A_df == "1", ])
+
+#Repeat process for Partition B
+cluster_B_df <- cutree(hc_wardB, k = 5)
+clustersB <- as.data.frame(cbind(partB, cluster_B_df))
+#Checking number of rows in cluster B (23)
+nrow(clustersB)
+
+#Create a vector of the mean for each observation in partition B (aka centroid value)
+clustB <- colMeans(clustersB[clustersB$cluster_B_df == "1", ])
+
+#Create a results table for partition A and B cluster centroid values
+Centroids <- rbind(clustA, clustB)
+print(Centroids)
+
+
+```
+
+**5. Assess how consistent the cluster assignments are compared to the assignments based on all the data.**
+
+Cluster A and B have the same weight and vitamin values but the fat, protein, calories, sugars, potassium, carbohydrates and fiber differ between the two clusters. If we consider criteria for what would be a "healthy" cereal, we would want to see low calories, high protein, low fat, high fiber, low carbo, low sugar, high potass, high vitamins.  For these criteria, the values tend to suggest that cluster B would perform best against these metrics.
+
+
+**6. The elementary public schools would like to choose a set of cereals to include in their daily cafeterias. Every day a different cereal is offered, but all cereals should support a healthy diet. For this goal, you are requested to find a cluster of “healthy cereals.” Should the data be normalized? If not, how should they be used in the cluster analysis?**
+
+```{r}
+library(dplyr)
+
+
+#find the healthy cereal cluster based on what is considered "healthy" criteria:
+
+healthy_cereal_clust <- cluster_A_df[which(df_cereal3$sugars < 3 & df_cereal3$fiber > 5 & df_cereal3$calories < 100 & df_cereal3$carbo < 10 &  df_cereal3$protein >= 3 & df_cereal3$potass > 50 & df_cereal3$vitamins > 20)]
+cat("Healthy Cereals Cluster:", healthy_cereal_clust, "\n")
+
+
+```
+
+Based on the criteria above, we can determine the healthy cereals cluster. I chose to use scaled data due to the fact that the data contains int and dbl and do have varying scales as it is good practice when calculating euclidian distances as they are scale dependent due to the fact that variables with differing scales can influence the total distance. The values for what is considered "Healthy" should be pre-defined. In this analysis, I chose to consider based on the fact that we would want to see low calories, high protein, low fat, high fiber, low carbo, low sugar, high potass, high vitamins.
+
+
